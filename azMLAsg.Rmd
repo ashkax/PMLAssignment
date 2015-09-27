@@ -1,0 +1,123 @@
+---
+title: "Human Activity Recognition - Weight Lifting Exercises"
+author: "Ashkan Ziabakhshdeylami"
+date: "September 27, 2015"
+output: html_document
+---
+# Introduction
+This human activity recognition research has traditionally focused on discriminating between different activities, i.e. to predict "which" activity was performed at a specific point in time (like with the Daily Living Activities dataset above). The approach we propose for the Weight Lifting Exercises dataset is to investigate "how (well)" an activity was performed by the wearer. The "how (well)" investigation has only received little attention so far, even though it potentially provides useful information for a large variety of applications,such as sports training.
+In this work (see the paper) we first define quality of execution and investigate three aspects that pertain to qualitative activity recognition: the problem of specifying correct execution, the automatic and robust detection of execution mistakes, and how to provide feedback on the quality of execution to the user. We tried out an on-body sensing approach (dataset here), but also an "ambient sensing approach" (by using Microsoft Kinect - dataset still unavailable)
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz3mx4ukZWC
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+https://cran.r-project.org/web/packages/caret/vignettes/caret.pdf
+
+
+
+# Load data
+```{r}
+setwd("C:/Users/Ashkan/Desktop/Assignment")
+set.seed(1365)
+library(caret)
+
+training <- read.csv("pml-training.csv" , header = TRUE, sep = ",")
+testing <- read.csv("pml-testing.csv" , header = TRUE, sep = ",") 
+
+predictorIdx <- c(grep("^accel", names(training)), grep("^gyros", names(training)), 
+    grep("^magnet", names(training)), grep("^roll", names(training)), grep("^pitch", 
+      names(training)), grep("^yaw", names(training)), grep("^total", names(training)) , grep("^classe", names(training)))
+
+training <- training[, c(predictorIdx )]
+testing <- testing[, c(predictorIdx )]
+
+
+training[is.na(training)] <- 0
+testing[is.na(testing)] <- 0
+
+
+num_features_idx = which(lapply(training, class) %in% c("numeric"))
+training <- cbind( as.factor(training$classe), training[, num_features_idx])
+
+testing <- testing[, num_features_idx]
+names(training)[1] <- "classe"
+
+trainIdx <- createDataPartition(y = training$classe, p = 0.8, list = FALSE)
+
+cvTrain <- training[trainIdx, ]
+cvTest  <- training[-trainIdx, ]
+
+```
+
+
+# Prediction Algorithms
+## Quadratic Discriminant Analysis
+```{r}
+fitCtrl <- trainControl(method = "repeatedcv", number = 10, repeats = 10)
+
+modelQDA  <- train(classe ~ .
+                , data = cvTrain
+                , method = "qda"
+                , preProcess = c("center", "scale")
+                )
+predTrain <- predict(modelQDA, cvTrain)
+confusionMatrix(predTrain, cvTrain$classe)
+predTrain <- predict(modelQDA, cvTest)
+confusionMatrix(predTrain, cvTest$classe)
+```
+
+
+
+
+
+## Random Foreset
+I try using random foresets to see if I get better results
+
+```{r}
+library(randomForest)
+model  <- randomForest(classe ~ ., cvTrain)
+
+predTrain <- predict(model, cvTrain)
+confusionMatrix(predTrain, cvTrain$classe)
+
+predTrain <- predict(model, cvTest)
+confusionMatrix(predTrain, cvTest$classe)
+
+```
+
+
+Do the authors describe what they expect the out of sample error to be and estimate the error appropriately with cross-validation?
+The cross validation Accuracy is : 0.9954117  
+
+
+
+
+
+# Output for assignment testing
+```{r}
+predTest <- predict(model, testing)
+
+
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(predTest)
+
+
+```
+
+
+
+
+
+
+
+
